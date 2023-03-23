@@ -1,6 +1,14 @@
 import { Embeddings } from "../embeddings/base.js";
 import { Document } from "../document.js";
 import { BaseRetriever } from "../schema/index.js";
+import {
+  BaseMemory,
+  getInputValue,
+  InputValues,
+  MemoryVariables,
+  OutputValues,
+} from "../memory/base.js";
+import { PromptTemplate } from "../prompts/prompt.js";
 
 export class VectorStoreRetriever extends BaseRetriever {
   vectorStore: VectorStore;
@@ -16,6 +24,59 @@ export class VectorStoreRetriever extends BaseRetriever {
   async getRelevantTexts(query: string): Promise<Document[]> {
     const results = await this.vectorStore.similaritySearch(query, 4);
     return results;
+  }
+}
+
+interface VectorStoreMemoryParams {
+  vectorStore: VectorStore;
+  k?: number;
+  template?: PromptTemplate;
+  inputKey?: string;
+  outputKey?: string;
+  memoryKey?: string;
+}
+
+export class VectorStoreMemory extends BaseMemory {
+  vectorStore: VectorStore;
+
+  k: number;
+
+  template: PromptTemplate;
+
+  inputKey?: string;
+
+  outputKey?: string;
+
+  memoryKey: string;
+
+  constructor(fields: VectorStoreMemoryParams) {
+    super();
+    this.vectorStore = fields.vectorStore;
+    this.k = fields.k ?? 4;
+    this.template =
+      fields.template ?? PromptTemplate.fromTemplate("{input}\n\n{output}");
+    this.inputKey = fields.inputKey;
+    this.outputKey = fields.outputKey;
+    this.memoryKey = fields.memoryKey ?? "memory";
+  }
+
+  async loadMemoryVariables(values: InputValues): Promise<MemoryVariables> {
+    const query = getInputValue(values, this.inputKey);
+    const results = await this.vectorStore.similaritySearch(query, this.k);
+    return {
+      [this.memoryKey]: results,
+    };
+  }
+
+  async saveContext(
+    inputValues: InputValues,
+    outputValues: OutputValues
+  ): Promise<void> {
+    const text = await this.template.format({
+      input: getInputValue(inputValues, this.inputKey),
+      output: getInputValue(outputValues, this.outputKey),
+    });
+    await this.vectorStore.addDocuments([new Document({ pageContent: text })]);
   }
 }
 
@@ -91,6 +152,10 @@ export abstract class VectorStore {
 
   asRetriever(k?: number): BaseRetriever {
     return new VectorStoreRetriever({ vectorStore: this, k });
+  }
+
+  asMemory(fields: Omit<VectorStoreMemoryParams, "vectorStore">): BaseMemory {
+    return new VectorStoreMemory({ vectorStore: this, ...fields });
   }
 }
 
