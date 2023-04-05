@@ -2,7 +2,7 @@ import assert from "assert";
 import { OpenAI } from "langchain";
 import { loadPrompt } from "langchain/prompts";
 import { HNSWLib } from "langchain/vectorstores";
-import { OpenAIEmbeddings } from "langchain/embeddings";
+import { OpenAIEmbeddings, CohereEmbeddings } from "langchain/embeddings";
 import { InMemoryDocstore, Document } from "langchain/docstore";
 import { CSVLoader } from "langchain/document_loaders";
 
@@ -10,6 +10,9 @@ import { CSVLoader } from "langchain/document_loaders";
 assert(typeof OpenAI === "function");
 assert(typeof loadPrompt === "function");
 assert(typeof HNSWLib === "function");
+
+// Test that Node can see Node-only exports
+assert(typeof CohereEmbeddings === "function");
 
 // Test dynamic imports of peer dependencies
 const { HierarchicalNSW } = await HNSWLib.imports();
